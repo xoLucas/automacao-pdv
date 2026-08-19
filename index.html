@@ -165,9 +165,6 @@
     <div id="tela-inicial">
         <div class="login-card">
             <h1>📍 PDV Tracker</h1>
-            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 8px; border-radius: 5px; margin-bottom: 15px; text-align: center;">
-                <small>Versão de Demonstração - Limitada a 10 PDVs</small>
-            </div>
             <p>Insira o código do seu grupo de trabalho:</p>
             <input type="text" id="codigoGrupoInput" class="input-grupo" placeholder="Ex: grupo-vendas-es" />
             <button class="btn-primario" onclick="acessarGrupo()">Entrar no Grupo</button>
@@ -179,10 +176,6 @@
 
     <div id="sidebar">
         <h2 id="titulo-grupo">Grupo: -</h2>
-        <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 8px; border-radius: 5px; margin-bottom: 15px; text-align: center;">
-            <strong>⚠️ Versão de Demonstração</strong><br>
-            <small>Limitada aos 10 primeiros PDVs da planilha</small>
-        </div>
         <div style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
             <label><strong>Importar Planilha:</strong></label><br>
             <input type="file" id="uploadExcel" accept=".xlsx, .xls, .csv" style="margin-top:10px;"/>
@@ -666,7 +659,7 @@
             fd.append('file', file); 
             fd.append('grupo_id', grupoAtual);
             
-            document.getElementById('todo-list').innerHTML = "<p style='text-align:center;'>Processando planilha... (Versão Demo: limitada a 10 PDVs)</p>";
+            document.getElementById('todo-list').innerHTML = "<p style='text-align:center;'>Processando planilha... Aguarde os PDVs aparecerem no mapa.</p>";
             
             try {
                 const response = await fetch(URL_BACKEND_RENDER, { method: 'POST', body: fd });

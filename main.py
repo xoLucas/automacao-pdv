@@ -83,9 +83,6 @@ def buscar_coordenadas(endereco_original):
 def processar_em_segundo_plano(df, grupo_id, coluna_endereco):
     # Remove linhas onde o endereço está vazio
     df = df.dropna(subset=[coluna_endereco])
-    
-    # VERSÃO DE DEMONSTRAÇÃO: Limita a 10 PDVs
-    df = df.head(10)
 
     for index, row in df.iterrows():
         endereco_raw = str(row[coluna_endereco]).strip()
@@ -149,7 +146,7 @@ async def processar_planilha(
             
         background_tasks.add_task(processar_em_segundo_plano, df, grupo_id, coluna_endereco)
         
-        return {"mensagem": "Processamento iniciado! (Versão Demo: limitada aos 10 primeiros PDVs)"}
+        return {"mensagem": "Processamento iniciado! Os PDVs aparecerão no mapa conforme forem localizados."}
         
     except Exception as e:
         return {"erro": f"Erro ao ler arquivo: {str(e)}"}
