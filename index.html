@@ -8,9 +8,9 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; }
+        body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; overflow: hidden; }
         
-        /* Layout Principal */
+        /* Layout Principal (Desktop) */
         #sidebar { width: 30%; background: #fff; padding: 20px; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: none; }
         #map { width: 70%; height: 100%; display: none; position: relative; }
         
@@ -34,6 +34,10 @@
         .pdv-card.pendente { border-left-color: #007bff; }
         .pdv-card.concluido { border-left-color: #28a745; opacity: 0.7; }
         .pdv-card.problema { border-left-color: #dc3545; }
+
+        .pdv-card.sub-pendente { border-left-color: #fd7e14; } 
+        .pdv-card.sub-concluido { border-left-color: #19692c; opacity: 0.8; } 
+        .pdv-card.sub-problema { border-left-color: #ff9999; } 
         
         /* Estilo dos Pinos */
         .custom-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; background: #6c757d; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; border: 2px solid #fff; }
@@ -41,39 +45,122 @@
         .pin-concluido .custom-pin { background-color: #28a745; }
         .pin-problema .custom-pin { background-color: #dc3545; }
 
-        /* Estilo do Marcador de Localização (Usuário) */
+        .pin-sub-pendente .custom-pin { background-color: #fd7e14; }
+        .pin-sub-concluido .custom-pin { background-color: #19692c; }
+        .pin-sub-problema .custom-pin { background-color: #ff9999; }
+
+        /* Estilo do Marcador de Localização */
         .user-location-marker { background-color: #2c7efc; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
         .user-location-pulse { width: 15px; height: 15px; background-color: #2c7efc; border-radius: 50%; position: absolute; animation: pulse 2s infinite; }
+        /* Estilo do Marcador Offline (Cinza e sem pulso) */
+        .offline-user-marker { background-color: #9e9e9e; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.3); opacity: 0.7; transition: all 0.5s; }
+        .other-user-marker { background-color: #ff5722; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
+        .other-user-pulse { width: 15px; height: 15px; background-color: #ff5722; border-radius: 50%; position: absolute; animation: pulse 2s infinite; }
+
         @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
 
-        /* Botão de Centralizar (Floating Button) */
+        /* Botão de Centralizar */
         .btn-center-map {
-            background: white;
-            width: 44px; height: 44px;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
-            font-size: 24px;
-            color: #333;
-            transition: background 0.2s;
+            background: white; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; font-size: 24px; color: #333; transition: background 0.2s;
         }
         .btn-center-map:hover { background: #f0f0f0; }
-        .btn-center-map:active { background: #ddd; }
         
         /* Abas no menu lateral */
         .abas-container { display: flex; gap: 5px; margin-bottom: 15px; }
         .btn-aba { flex: 1; padding: 10px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; color: white; transition: 0.3s; }
         .btn-aba.inativo { background-color: #6c757d; opacity: 0.6; }
 
+        /* Toggle de Substituição */
+        .toggle-container { margin-top: 15px; display: flex; align-items: center; justify-content: space-between; background: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #fd7e14; }
+        input:checked + .slider:before { transform: translateX(18px); }
+
         /* Estilos do Formulário de Edição no Popup */
         .form-edicao { min-width: 220px; }
         .form-edicao label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-top: 8px; margin-bottom: 2px; }
         .form-edicao input, .form-edicao select { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 13px; }
         .form-edicao select { background-color: #f8f9fa; cursor: pointer; }
+
+        /* Modal de Confirmação */
+        #modal-confirmacao { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5000; display: none; align-items: center; justify-content: center; }
+        .modal-card { background: #fff; padding: 25px; border-radius: 10px; width: 300px; text-align: center; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+        .modal-card h3 { margin-top: 0; color: #333; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+        .modal-card p { color: #555; font-size: 15px; margin-bottom: 20px; }
+        .botoes-modal { display: flex; gap: 10px; }
+
+        #btn-toggle-sidebar { display: none; }
+
+        @media (max-width: 768px) {
+            body { display: block; } 
+            
+            #map { width: 100% !important; height: 100vh !important; position: absolute; top: 0; left: 0; }
+            
+            #sidebar { 
+                width: 100% !important; 
+                height: 70vh !important; 
+                position: fixed !important; 
+                bottom: 0; 
+                left: 0; 
+                border-radius: 20px 20px 0 0; 
+                transform: translateY(100%); 
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+                z-index: 3000 !important; 
+                box-sizing: border-box;
+                padding-top: 30px; 
+                padding-bottom: 80px;
+                box-shadow: 0 -5px 15px rgba(0,0,0,0.2) !important;
+            }
+            
+            #sidebar::before {
+                content: ''; position: absolute; top: 12px; left: 50%;
+                transform: translateX(-50%); width: 45px; height: 5px;
+                background: #ccc; border-radius: 5px;
+            }
+
+            #sidebar.aberto { transform: translateY(0); }
+            
+            #btn-toggle-sidebar { 
+                display: flex; 
+                position: fixed;
+                bottom: 25px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 3500 !important;
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 12px 28px;
+                border-radius: 30px;
+                font-size: 15px;
+                font-weight: bold;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+                cursor: pointer;
+                transition: background 0.3s;
+            }
+
+            .login-card { width: 85%; max-width: 320px; }
+            
+            .leaflet-popup-content { max-width: 250px !important; } 
+        }
     </style>
 </head>
 <body>
+
+    <div id="modal-confirmacao">
+        <div class="modal-card">
+            <h3>Confirmação</h3>
+            <p id="texto-confirmacao">Tem certeza que deseja fazer isso?</p>
+            <div class="botoes-modal">
+                <button class="btn-primario" style="background:#007bff; flex:1;" onclick="executarAcaoPendente()">Sim</button>
+                <button class="btn-primario" style="background:#6c757d; flex:1;" onclick="fecharModal()">Não</button>
+            </div>
+        </div>
+    </div>
 
     <div id="tela-inicial">
         <div class="login-card">
@@ -85,12 +172,23 @@
         </div>
     </div>
 
+    <button id="btn-toggle-sidebar" onclick="toggleSidebar()">📋 Ver Lista</button>
+
     <div id="sidebar">
         <h2 id="titulo-grupo">Grupo: -</h2>
         <div style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
             <label><strong>Importar Planilha:</strong></label><br>
             <input type="file" id="uploadExcel" accept=".xlsx, .xls, .csv" style="margin-top:10px;"/>
         </div>
+
+        <div class="toggle-container">
+            <label style="font-size: 13px; font-weight: bold; color: #333;">Ver PDV's de substituição</label>
+            <label class="switch">
+                <input type="checkbox" id="toggle-sub" onchange="alternarSubs()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <br>
         
         <div class="abas-container">
             <button id="btn-aba-pendente" class="btn-aba" style="background-color: #007bff;" onclick="mudarVisao('pendente')">Pendentes</button>
@@ -109,6 +207,7 @@
         const URL_SUPABASE = "https://amdsexfmtwqgdihlyqti.supabase.co";
         const CHAVE_SUPABASE = "sb_publishable_xisIAK-FwYMFXirHON0GqA_XCQrp6St";
         const URL_BACKEND_RENDER = "https://api-pdv-tracker.onrender.com/processar-planilha/"; 
+        //const URL_BACKEND_RENDER = "http://127.0.0.1:8000/processar-planilha/"
         
         const supabaseClient = window.supabase.createClient(URL_SUPABASE, CHAVE_SUPABASE);
         const parametrosUrl = new URLSearchParams(window.location.search);
@@ -119,9 +218,15 @@
         let userMarker;
         let userAccuracyCircle;
         let minhaPosicaoAtual = null;
-
         let todosOsPdvs = [];
         let visaoAtual = 'pendente'; 
+        let mostrarSubstituicao = false; 
+
+        let meuUsuarioId = 'user-' + Math.random().toString(36).substr(2, 9);
+        let canalPresenca;
+        let marcadoresOutrosUsuarios = {};
+        
+        let acaoPendente = null;
 
         if (grupoAtual) {
             iniciarApp();
@@ -129,11 +234,8 @@
 
         function acessarGrupo() {
             const codigo = document.getElementById('codigoGrupoInput').value.trim();
-            if (codigo) {
-                window.location.href = '?grupo=' + codigo;
-            } else {
-                alert("Por favor, digite um código!");
-            }
+            if (codigo) window.location.href = '?grupo=' + codigo;
+            else alert("Por favor, digite um código!");
         }
 
         function criarNovoGrupo() {
@@ -144,10 +246,14 @@
 
         function iniciarApp() {
             document.getElementById('tela-inicial').style.display = 'none';
-            document.getElementById('sidebar').style.display = 'block';
+            document.getElementById('sidebar').style.display = 'block'; 
             document.getElementById('map').style.display = 'block';
             document.getElementById('titulo-grupo').innerText = "Grupo: " + grupoAtual;
             
+            if (window.innerWidth <= 768) {
+                document.getElementById('btn-toggle-sidebar').style.display = 'flex';
+            }
+
             map = L.map('map').setView([-19.5314, -40.6289], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             camadaPdvs = L.layerGroup().addTo(map);
@@ -157,6 +263,97 @@
 
             carregarPdvsDoBanco();
             ativarRealtime();
+            ativarMultiplayer(); 
+
+            map.on('popupopen', function() {
+                if (window.innerWidth <= 768) {
+                    const sidebar = document.getElementById('sidebar');
+                    if (sidebar.classList.contains('aberto')) {
+                        toggleSidebar(); 
+                    }
+                }
+            });
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const btn = document.getElementById('btn-toggle-sidebar');
+            sidebar.classList.toggle('aberto');
+            
+            if (sidebar.classList.contains('aberto')) {
+                btn.innerHTML = '🗺️ Esconder Lista';
+                btn.style.background = '#6c757d'; 
+            } else {
+                btn.innerHTML = '📋 Ver Lista';
+                btn.style.background = '#007bff';
+            }
+        }
+
+        function alternarSubs() {
+            mostrarSubstituicao = document.getElementById('toggle-sub').checked;
+            renderizarPdvs();
+        }
+
+        function pedirConfirmacao(mensagem, acao, id) {
+            document.getElementById('texto-confirmacao').innerText = mensagem;
+            document.getElementById('modal-confirmacao').style.display = 'flex';
+            acaoPendente = { acao: acao, id: id };
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-confirmacao').style.display = 'none';
+            acaoPendente = null;
+        }
+
+        function executarAcaoPendente() {
+            if (!acaoPendente) return;
+            const { acao, id } = acaoPendente;
+            fecharModal(); 
+            if (acao === 'concluido' || acao === 'problema') alterarStatus(id, acao);
+            else if (acao === 'salvar_edicao') salvarEdicao(id);
+        }
+
+        function ativarMultiplayer() {
+            canalPresenca = supabaseClient.channel('tracking_' + grupoAtual);
+            canalPresenca.on('presence', { event: 'sync' }, () => {
+                renderizarOutrosUsuarios(canalPresenca.presenceState());
+            }).subscribe();
+        }
+
+        function renderizarOutrosUsuarios(estado) {
+            const usuariosAtivosAgora = [];
+
+            // 1. Passa por todo mundo que está ONLINE no momento
+            for (const key in estado) {
+                const dados = estado[key][0]; 
+                
+                if (dados.id !== meuUsuarioId) {
+                    usuariosAtivosAgora.push(dados.id);
+                    
+                    const iconOnline = L.divIcon({ className: 'other-user-marker', html: '<div class="other-user-pulse"></div>', iconSize: [15, 15] });
+
+                    if (marcadoresOutrosUsuarios[dados.id]) {
+                        // Se o pino já existe, atualiza a posição e GARANTE que ele está com a cor laranja (online)
+                        marcadoresOutrosUsuarios[dados.id].setLatLng([dados.lat, dados.lng]);
+                        marcadoresOutrosUsuarios[dados.id].setIcon(iconOnline);
+                    } else {
+                        // Se é um colega novo, cria o pino dele
+                        marcadoresOutrosUsuarios[dados.id] = L.marker([dados.lat, dados.lng], { icon: iconOnline, zIndexOffset: 900 }).addTo(map);
+                    }
+                }
+            }
+
+            // 2. Verifica os "Fantasmas" (quem estava no mapa mas sumiu do estado online)
+            for (const idColega in marcadoresOutrosUsuarios) {
+                if (!usuariosAtivosAgora.includes(idColega)) {
+                    // O SEGREDO ESTÁ AQUI: Em vez de usar map.removeLayer(), nós mudamos o ícone!
+                    const iconOffline = L.divIcon({ className: 'offline-user-marker', html: '', iconSize: [12, 12] });
+                    marcadoresOutrosUsuarios[idColega].setIcon(iconOffline);
+                    
+                    // Aviso no console só para você acompanhar nos testes
+                    console.log(`Colega ${idColega} ficou offline. Mantendo última localização.`);
+                }
+            }
         }
 
         function adicionarBotaoCentralizar() {
@@ -164,17 +361,10 @@
                 options: { position: 'bottomright' },
                 onAdd: function() {
                     const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-                    div.innerHTML = `
-                        <div class="btn-center-map" title="Centralizar em mim">
-                            🎯
-                        </div>
-                    `;
+                    div.innerHTML = `<div class="btn-center-map" title="Centralizar em mim">🎯</div>`;
                     div.onclick = function() {
-                        if (minhaPosicaoAtual) {
-                            map.flyTo([minhaPosicaoAtual.lat, minhaPosicaoAtual.lng], 16);
-                        } else {
-                            alert("Aguardando sinal do GPS...");
-                        }
+                        if (minhaPosicaoAtual) map.flyTo([minhaPosicaoAtual.lat, minhaPosicaoAtual.lng], 16);
+                        else alert("Aguardando sinal do GPS...");
                     };
                     return div;
                 }
@@ -184,27 +374,23 @@
 
         function configurarLocalizacaoEmTempoReal() {
             if (!navigator.geolocation) return;
-
             navigator.geolocation.watchPosition(
                 (pos) => {
                     const { latitude, longitude, accuracy } = pos.coords;
                     minhaPosicaoAtual = { lat: latitude, lng: longitude };
 
                     if (!userMarker) {
-                        const userIcon = L.divIcon({
-                            className: 'user-location-marker',
-                            html: '<div class="user-location-pulse"></div>',
-                            iconSize: [15, 15]
-                        });
+                        const userIcon = L.divIcon({ className: 'user-location-marker', html: '<div class="user-location-pulse"></div>', iconSize: [15, 15] });
                         userMarker = L.marker([latitude, longitude], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
                         userAccuracyCircle = L.circle([latitude, longitude], { radius: accuracy, weight: 1, color: '#2c7efc', fillOpacity: 0.1 }).addTo(map);
-                        
                         map.setView([latitude, longitude], 15);
                     } else {
                         userMarker.setLatLng([latitude, longitude]);
                         userAccuracyCircle.setLatLng([latitude, longitude]);
                         userAccuracyCircle.setRadius(accuracy);
                     }
+
+                    if (canalPresenca) canalPresenca.track({ id: meuUsuarioId, lat: latitude, lng: longitude });
                 },
                 (err) => console.warn(err),
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -221,7 +407,6 @@
 
         function mudarVisao(novaVisao) {
             visaoAtual = novaVisao;
-            
             const btnPendente = document.getElementById('btn-aba-pendente');
             const btnProblema = document.getElementById('btn-aba-problema');
 
@@ -236,7 +421,6 @@
                 btnPendente.style.backgroundColor = '';
                 btnProblema.style.backgroundColor = '#dc3545';
             }
-
             renderizarPdvs(); 
         }
 
@@ -245,32 +429,45 @@
             container.innerHTML = ''; 
             camadaPdvs.clearLayers(); 
 
-            const pdvsFiltrados = todosOsPdvs.filter(p => p.status === visaoAtual);
+            const pdvsFiltrados = todosOsPdvs.filter(p => {
+                if (p.status !== visaoAtual) return false;
+                const isSub = p.pad_sub && p.pad_sub.toLowerCase() === 'sub';
+                if (isSub && !mostrarSubstituicao) return false;
+                if (isSub && visaoAtual === 'problema') return false;
+                return true;
+            });
 
             if (pdvsFiltrados.length === 0) {
                 const msg = visaoAtual === 'pendente' ? 'Tudo limpo! ✅' : 'Nenhum erro registrado! 🎉';
                 container.innerHTML = `<p style="text-align:center; color:green;"><b>${msg}</b></p>`;
             }
 
-            // Renderiza a lista lateral
             pdvsFiltrados.forEach(pdv => {
+                const isSub = pdv.pad_sub && pdv.pad_sub.toLowerCase() === 'sub';
+                const prefixoClasse = isSub ? 'sub-' : '';
+                const classeCardEPino = prefixoClasse + pdv.status; 
+
                 const card = document.createElement('div');
-                card.className = 'pdv-card ' + pdv.status;
+                card.className = 'pdv-card ' + classeCardEPino;
                 
+                const badgeHtml = isSub ? `<span style="background:#fd7e14; color:white; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:5px;">SUBSTITUIÇÃO</span>` : '';
+                const textoFeito = isSub ? '✔ Utilizado' : '✔ Feito';
+                const textoMarcarFeito = isSub ? '✔ Marcar como Utilizado' : '✔ Marcar Concluído';
+
                 let botoesHtml = '';
                 if (visaoAtual === 'pendente') {
                     botoesHtml = `
-                        <button class="btn-primario" style="background:#28a745; flex: 1;" onclick="alterarStatus(${pdv.id}, 'concluido')">✔ Feito</button>
-                        <button class="btn-primario" style="background:#dc3545; flex: 1;" onclick="alterarStatus(${pdv.id}, 'problema')">✖ Erro</button>
+                        <button class="btn-primario" style="background:#28a745; flex: 1;" onclick="pedirConfirmacao('${isSub ? 'Marcar como UTILIZADO?' : 'Marcar este PDV como CONCLUÍDO?'}', 'concluido', ${pdv.id})">${textoFeito}</button>
+                        <button class="btn-primario" style="background:#dc3545; flex: 1;" onclick="pedirConfirmacao('Reportar ERRO neste PDV?', 'problema', ${pdv.id})">✖ Erro</button>
                     `;
                 } else if (visaoAtual === 'problema') {
                     botoesHtml = `
-                        <button class="btn-primario" style="background:#28a745; width: 100%;" onclick="alterarStatus(${pdv.id}, 'concluido')">✔ Marcar como Feito</button>
+                        <button class="btn-primario" style="background:#28a745; width: 100%;" onclick="pedirConfirmacao('${isSub ? 'O problema foi resolvido? Marcar como UTILIZADO.' : 'O problema foi resolvido? Marcar como FEITO.'}', 'concluido', ${pdv.id})">${textoMarcarFeito}</button>
                     `;
                 }
 
                 card.innerHTML = `
-                    <h4>${pdv.nome}</h4>
+                    <h4>${pdv.nome} ${badgeHtml}</h4>
                     <p>PDV: ${pdv.numero_pdv}</p>
                     <p>${pdv.endereco}</p>
                     <div style="display: flex; gap: 5px;">
@@ -279,49 +476,52 @@
                 container.appendChild(card);
             });
 
-            // Lógica para separar PDVs com coordenadas idênticas no Mapa
             const coordenadasUsadas = {};
 
             todosOsPdvs.forEach(pdv => {
+                const isSub = pdv.pad_sub && pdv.pad_sub.toLowerCase() === 'sub';
+                if (isSub && !mostrarSubstituicao) return; 
+
                 if (pdv.lat && pdv.lon) {
                     let lat = parseFloat(pdv.lat);
                     let lon = parseFloat(pdv.lon);
                     
-                    // Cria uma chave única para a coordenada arredondando um pouco
                     let chaveCoord = `${lat.toFixed(5)},${lon.toFixed(5)}`;
                     
                     if (coordenadasUsadas[chaveCoord]) {
-                        // Se já tem um ping lá, a gente empurra o novo para o lado
                         let contagem = coordenadasUsadas[chaveCoord];
-                        
-                        // Fórmula para criar um círculo em volta do ponto original
-                        let angulo = contagem * (Math.PI / 4); // Distribui em 45 graus
-                        let raio = 0.00015; // Aproximadamente 15 metros no mapa
-                        
+                        let angulo = contagem * (Math.PI / 4); 
+                        let raio = 0.00015; 
                         lat += Math.sin(angulo) * raio;
                         lon += Math.cos(angulo) * raio;
-                        
                         coordenadasUsadas[chaveCoord]++;
                     } else {
                         coordenadasUsadas[chaveCoord] = 1;
                     }
 
+                    const prefixoClasse = isSub ? 'sub-' : '';
+                    const classeCardEPino = prefixoClasse + pdv.status; 
+
                     const icon = L.divIcon({ 
-                        className: 'pin-' + pdv.status, 
+                        className: 'pin-' + classeCardEPino, 
                         html: '<div class="custom-pin"></div>', 
                         iconSize: [30, 30], 
                         iconAnchor: [15, 30] 
                     });
 
-                    // Usa as novas coordenadas (lat, lon) modificadas para renderizar o ping
+                    const badgeHtml = isSub ? `<span style="background:#fd7e14; color:white; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:5px;">SUBSTITUIÇÃO</span>` : '';
+                    const textoMarcarFeito = isSub ? '✔ Marcar como Utilizado' : '✔ Marcar Concluído';
+                    let statusLabel = pdv.status.toUpperCase();
+                    if (isSub && pdv.status === 'concluido') statusLabel = 'UTILIZADO';
+
                     L.marker([lat, lon], { icon }).addTo(camadaPdvs)
                     .bindPopup(`
                         <div id="popup-container-${pdv.id}">
-                            <b>${pdv.numero_pdv} - ${pdv.nome}</b><br>
-                            Status: <b>${pdv.status.toUpperCase()}</b><br>
+                            <b>${pdv.numero_pdv} - ${pdv.nome}</b> ${badgeHtml}<br>
+                            Status: <b>${statusLabel}</b><br>
                             <hr>
-                            <button class="btn-primario" style="background:#28a745; width:100%;" onclick="alterarStatus(${pdv.id}, 'concluido')">✔ Marcar Concluído</button>
-                            <button class="btn-primario" style="background:#dc3545; width:100%; margin-top:5px;" onclick="alterarStatus(${pdv.id}, 'problema')">✖ Relatar Problema</button>
+                            <button class="btn-primario" style="background:#28a745; width:100%;" onclick="pedirConfirmacao('${isSub ? 'Marcar como UTILIZADO?' : 'Marcar este PDV como CONCLUÍDO?'}', 'concluido', ${pdv.id})">${textoMarcarFeito}</button>
+                            <button class="btn-primario" style="background:#dc3545; width:100%; margin-top:5px;" onclick="pedirConfirmacao('Reportar ERRO neste PDV?', 'problema', ${pdv.id})">✖ Relatar Problema</button>
                             <button class="btn-primario" style="background:#ffc107; color:#333; width:100%; margin-top:5px;" onclick="abrirEdicaoPdv(event, ${pdv.id})">✏️ Editar PDV</button>
                         </div>
                     `);
@@ -329,13 +529,12 @@
             });
         }
 
-        // --- FUNÇÕES DE EDIÇÃO CORRIGIDAS ---
-
         function abrirEdicaoPdv(event, id) {
             event.stopPropagation(); 
-
             const pdv = todosOsPdvs.find(p => p.id == id);
             if (!pdv) return;
+
+            const isSub = pdv.pad_sub && pdv.pad_sub.toLowerCase() === 'sub';
 
             setTimeout(() => {
                 const container = document.getElementById(`popup-container-${id}`);
@@ -348,7 +547,7 @@
                         <label>Status:</label>
                         <select id="edit-status-${id}">
                             <option value="pendente" ${pdv.status === 'pendente' ? 'selected' : ''}>Pendente</option>
-                            <option value="concluido" ${pdv.status === 'concluido' ? 'selected' : ''}>Concluído</option>
+                            <option value="concluido" ${pdv.status === 'concluido' ? 'selected' : ''}>${isSub ? 'Utilizado' : 'Concluído'}</option>
                             <option value="problema" ${pdv.status === 'problema' ? 'selected' : ''}>Problema (Erro)</option>
                         </select>
 
@@ -362,7 +561,7 @@
                         <input type="text" id="edit-endereco-${id}" value="${pdv.endereco}">
 
                         <div style="display: flex; gap: 5px; margin-top: 15px;">
-                            <button type="button" class="btn-primario" style="background:#007bff; flex: 1; margin-top: 0;" onclick="salvarEdicao(${id})">💾 Salvar</button>
+                            <button type="button" class="btn-primario" style="background:#007bff; flex: 1; margin-top: 0;" onclick="pedirConfirmacao('Deseja salvar as alterações neste PDV?', 'salvar_edicao', ${id})">💾 Salvar</button>
                             <button type="button" class="btn-primario" style="background:#6c757d; flex: 1; margin-top: 0;" onclick="map.closePopup()">❌ Cancelar</button>
                         </div>
                     </div>
@@ -378,12 +577,31 @@
 
             try {
                 const index = todosOsPdvs.findIndex(p => p.id == id);
-                if (index > -1) {
-                    todosOsPdvs[index].status = novoStatus;
-                    todosOsPdvs[index].numero_pdv = novoNumero;
-                    todosOsPdvs[index].nome = novoNome;
-                    todosOsPdvs[index].endereco = novoEndereco;
+                if (index === -1) return;
+
+                const pdvAtual = todosOsPdvs[index];
+                let novaLat = pdvAtual.lat; 
+                let novaLon = pdvAtual.lon; 
+
+                if (pdvAtual.endereco !== novoEndereco) {
+                    const baseUrl = URL_BACKEND_RENDER.replace('/processar-planilha/', '');
+                    const response = await fetch(`${baseUrl}/geolocalizar/?endereco=${encodeURIComponent(novoEndereco)}`);
+                    const data = await response.json();
+
+                    if (data.sucesso) {
+                        novaLat = data.lat;
+                        novaLon = data.lon;
+                    } else {
+                        alert("Aviso: Não achamos as coordenadas exatas desse novo endereço. O pino continuará no local antigo.");
+                    }
                 }
+
+                todosOsPdvs[index].status = novoStatus;
+                todosOsPdvs[index].numero_pdv = novoNumero;
+                todosOsPdvs[index].nome = novoNome;
+                todosOsPdvs[index].endereco = novoEndereco;
+                todosOsPdvs[index].lat = novaLat; 
+                todosOsPdvs[index].lon = novaLon; 
                 
                 map.closePopup(); 
                 renderizarPdvs(); 
@@ -392,18 +610,16 @@
                     status: novoStatus,
                     numero_pdv: novoNumero,
                     nome: novoNome,
-                    endereco: novoEndereco
+                    endereco: novoEndereco,
+                    lat: novaLat,
+                    lon: novaLon
                 }).eq('id', id);
-
-                setTimeout(() => { carregarPdvsDoBanco(); }, 500);
 
             } catch (error) {
                 console.error("Erro ao salvar edição:", error);
-                alert("Erro ao salvar os dados no banco.");
+                alert("Erro ao tentar atualizar o endereço.");
             }
         }
-
-        // -------------------------------
 
         function ativarRealtime() {
             supabaseClient.channel('mudancas').on('postgres_changes', 
@@ -419,10 +635,8 @@
                     todosOsPdvs[index].status = novoStatus;
                     renderizarPdvs();
                 }
-                
                 await supabaseClient.from('pdvs').update({ status: novoStatus }).eq('id', id);
                 setTimeout(() => { carregarPdvsDoBanco(); }, 500);
-
             } catch (error) {
                 console.error("Erro:", error);
             }
