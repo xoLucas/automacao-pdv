@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracker Colaborativo de PDVs</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; }
+        
+        /* Layout Principal */
+        #sidebar { width: 30%; background: #fff; padding: 20px; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 1000; display: none; }
+        #map { width: 70%; height: 100%; display: none; position: relative; }
+        
+        /* Tela de Login/Grupo */
+        #tela-inicial { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            height: 100vh; width: 100%; background: linear-gradient(135deg, #007bff, #0056b3); color: white; 
+            position: absolute; z-index: 2000; 
+        }
+        .login-card { background: white; padding: 30px; border-radius: 12px; color: #333; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; width: 320px; }
+        .login-card h1 { margin-top: 0; color: #007bff; }
+        .input-grupo { width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; text-align: center; }
+        
+        h2 { border-bottom: 2px solid #007bff; padding-bottom: 10px; color: #333; }
+        .btn-primario { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; width: 100%; margin-top: 10px; font-weight: bold; transition: 0.2s; }
+        .btn-primario:hover { filter: brightness(0.9); }
+        .btn-secundario { background: none; color: #007bff; border: none; margin-top: 15px; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
+        
+        /* Cards e Mapa */
+        .pdv-card { background: #f8f9fa; padding: 15px; margin-bottom: 12px; border-radius: 8px; border-left: 6px solid #6c757d; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .pdv-card.pendente { border-left-color: #007bff; }
+        .pdv-card.concluido { border-left-color: #28a745; opacity: 0.7; }
+        .pdv-card.problema { border-left-color: #dc3545; }
+        
+        /* Estilo dos Pinos */
+        .custom-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; background: #6c757d; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; border: 2px solid #fff; }
+        .pin-pendente .custom-pin { background-color: #007bff; }
+        .pin-concluido .custom-pin { background-color: #28a745; }
+        .pin-problema .custom-pin { background-color: #dc3545; }
+
+        /* Estilo do Marcador de Localização (Usuário) */
+        .user-location-marker { background-color: #2c7efc; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
+        .user-location-pulse { width: 15px; height: 15px; background-color: #2c7efc; border-radius: 50%; position: absolute; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(3); opacity: 0; } }
+
+        /* Botão de Centralizar (Floating Button) */
+        .btn-center-map {
+            background: white;
+            width: 44px; height: 44px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-size: 24px;
+            color: #333;
+            transition: background 0.2s;
+        }
+        .btn-center-map:hover { background: #f0f0f0; }
+        .btn-center-map:active { background: #ddd; }
+        
+        /* Abas no menu lateral */
+        .abas-container { display: flex; gap: 5px; margin-bottom: 15px; }
+        .btn-aba { flex: 1; padding: 10px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; color: white; transition: 0.3s; }
+        .btn-aba.inativo { background-color: #6c757d; opacity: 0.6; }
+
+        /* Estilos do Formulário de Edição no Popup */
+        .form-edicao { min-width: 220px; }
+        .form-edicao label { font-size: 12px; font-weight: bold; color: #555; display: block; margin-top: 8px; margin-bottom: 2px; }
+        .form-edicao input, .form-edicao select { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 13px; }
+        .form-edicao select { background-color: #f8f9fa; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="tela-inicial">
+        <div class="login-card">
+            <h1>📍 PDV Tracker</h1>
+            <p>Insira o código do seu grupo de trabalho:</p>
+            <input type="text" id="codigoGrupoInput" class="input-grupo" placeholder="Ex: grupo-vendas-es" />
+            <button class="btn-primario" onclick="acessarGrupo()">Entrar no Grupo</button>
+            <button class="btn-secundario" onclick="criarNovoGrupo()">Criar Novo Código</button>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <h2 id="titulo-grupo">Grupo: -</h2>
+        <div style="background: #e9ecef; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+            <label><strong>Importar Planilha:</strong></label><br>
+            <input type="file" id="uploadExcel" accept=".xlsx, .xls, .csv" style="margin-top:10px;"/>
+        </div>
+        
+        <div class="abas-container">
+            <button id="btn-aba-pendente" class="btn-aba" style="background-color: #007bff;" onclick="mudarVisao('pendente')">Pendentes</button>
+            <button id="btn-aba-problema" class="btn-aba inativo" onclick="mudarVisao('problema')">Com Erro</button>
+        </div>
+
+        <div id="todo-list"><p>Carregando...</p></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script>
+        const URL_SUPABASE = "https://amdsexfmtwqgdihlyqti.supabase.co";
+        const CHAVE_SUPABASE = "sb_publishable_xisIAK-FwYMFXirHON0GqA_XCQrp6St";
+        const URL_BACKEND_RENDER = "https://api-pdv-tracker.onrender.com/processar-planilha/"; 
+        
+        const supabaseClient = window.supabase.createClient(URL_SUPABASE, CHAVE_SUPABASE);
+        const parametrosUrl = new URLSearchParams(window.location.search);
+        let grupoAtual = parametrosUrl.get('grupo');
+
+        let map;
+        let camadaPdvs;
+        let userMarker;
+        let userAccuracyCircle;
+        let minhaPosicaoAtual = null;
+
+        let todosOsPdvs = [];
+        let visaoAtual = 'pendente'; 
+
+        if (grupoAtual) {
+            iniciarApp();
+        }
+
+        function acessarGrupo() {
+            const codigo = document.getElementById('codigoGrupoInput').value.trim();
+            if (codigo) {
+                window.location.href = '?grupo=' + codigo;
+            } else {
+                alert("Por favor, digite um código!");
+            }
+        }
+
+        function criarNovoGrupo() {
+            const novoCodigo = 'grupo-' + Math.random().toString(36).substr(2, 6);
+            alert("Seu novo código é: " + novoCodigo);
+            window.location.href = '?grupo=' + novoCodigo; 
+        }
+
+        function iniciarApp() {
+            document.getElementById('tela-inicial').style.display = 'none';
+            document.getElementById('sidebar').style.display = 'block';
+            document.getElementById('map').style.display = 'block';
+            document.getElementById('titulo-grupo').innerText = "Grupo: " + grupoAtual;
+            
+            map = L.map('map').setView([-19.5314, -40.6289], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            camadaPdvs = L.layerGroup().addTo(map);
+
+            adicionarBotaoCentralizar();
+            configurarLocalizacaoEmTempoReal();
+
+            carregarPdvsDoBanco();
+            ativarRealtime();
+        }
+
+        function adicionarBotaoCentralizar() {
+            const CenterControl = L.Control.extend({
+                options: { position: 'bottomright' },
+                onAdd: function() {
+                    const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                    div.innerHTML = `
+                        <div class="btn-center-map" title="Centralizar em mim">
+                            🎯
+                        </div>
+                    `;
+                    div.onclick = function() {
+                        if (minhaPosicaoAtual) {
+                            map.flyTo([minhaPosicaoAtual.lat, minhaPosicaoAtual.lng], 16);
+                        } else {
+                            alert("Aguardando sinal do GPS...");
+                        }
+                    };
+                    return div;
+                }
+            });
+            map.addControl(new CenterControl());
+        }
+
+        function configurarLocalizacaoEmTempoReal() {
+            if (!navigator.geolocation) return;
+
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    const { latitude, longitude, accuracy } = pos.coords;
+                    minhaPosicaoAtual = { lat: latitude, lng: longitude };
+
+                    if (!userMarker) {
+                        const userIcon = L.divIcon({
+                            className: 'user-location-marker',
+                            html: '<div class="user-location-pulse"></div>',
+                            iconSize: [15, 15]
+                        });
+                        userMarker = L.marker([latitude, longitude], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+                        userAccuracyCircle = L.circle([latitude, longitude], { radius: accuracy, weight: 1, color: '#2c7efc', fillOpacity: 0.1 }).addTo(map);
+                        
+                        map.setView([latitude, longitude], 15);
+                    } else {
+                        userMarker.setLatLng([latitude, longitude]);
+                        userAccuracyCircle.setLatLng([latitude, longitude]);
+                        userAccuracyCircle.setRadius(accuracy);
+                    }
+                },
+                (err) => console.warn(err),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        async function carregarPdvsDoBanco() {
+            const { data } = await supabaseClient.from('pdvs').select('*').eq('grupo_id', grupoAtual);
+            if (data) {
+                todosOsPdvs = data; 
+                renderizarPdvs();
+            }
+        }
+
+        function mudarVisao(novaVisao) {
+            visaoAtual = novaVisao;
+            
+            const btnPendente = document.getElementById('btn-aba-pendente');
+            const btnProblema = document.getElementById('btn-aba-problema');
+
+            if (visaoAtual === 'pendente') {
+                btnPendente.classList.remove('inativo');
+                btnProblema.classList.add('inativo');
+                btnProblema.style.backgroundColor = '';
+                btnPendente.style.backgroundColor = '#007bff';
+            } else {
+                btnProblema.classList.remove('inativo');
+                btnPendente.classList.add('inativo');
+                btnPendente.style.backgroundColor = '';
+                btnProblema.style.backgroundColor = '#dc3545';
+            }
+
+            renderizarPdvs(); 
+        }
+
+        function renderizarPdvs() {
+            const container = document.getElementById('todo-list');
+            container.innerHTML = ''; 
+            camadaPdvs.clearLayers(); 
+
+            const pdvsFiltrados = todosOsPdvs.filter(p => p.status === visaoAtual);
+
+            if (pdvsFiltrados.length === 0) {
+                const msg = visaoAtual === 'pendente' ? 'Tudo limpo! ✅' : 'Nenhum erro registrado! 🎉';
+                container.innerHTML = `<p style="text-align:center; color:green;"><b>${msg}</b></p>`;
+            }
+
+            // Renderiza a lista lateral
+            pdvsFiltrados.forEach(pdv => {
+                const card = document.createElement('div');
+                card.className = 'pdv-card ' + pdv.status;
+                
+                let botoesHtml = '';
+                if (visaoAtual === 'pendente') {
+                    botoesHtml = `
+                        <button class="btn-primario" style="background:#28a745; flex: 1;" onclick="alterarStatus(${pdv.id}, 'concluido')">✔ Feito</button>
+                        <button class="btn-primario" style="background:#dc3545; flex: 1;" onclick="alterarStatus(${pdv.id}, 'problema')">✖ Erro</button>
+                    `;
+                } else if (visaoAtual === 'problema') {
+                    botoesHtml = `
+                        <button class="btn-primario" style="background:#28a745; width: 100%;" onclick="alterarStatus(${pdv.id}, 'concluido')">✔ Marcar como Feito</button>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <h4>${pdv.nome}</h4>
+                    <p>PDV: ${pdv.numero_pdv}</p>
+                    <p>${pdv.endereco}</p>
+                    <div style="display: flex; gap: 5px;">
+                        ${botoesHtml}
+                    </div>`;
+                container.appendChild(card);
+            });
+
+            // Lógica para separar PDVs com coordenadas idênticas no Mapa
+            const coordenadasUsadas = {};
+
+            todosOsPdvs.forEach(pdv => {
+                if (pdv.lat && pdv.lon) {
+                    let lat = parseFloat(pdv.lat);
+                    let lon = parseFloat(pdv.lon);
+                    
+                    // Cria uma chave única para a coordenada arredondando um pouco
+                    let chaveCoord = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+                    
+                    if (coordenadasUsadas[chaveCoord]) {
+                        // Se já tem um ping lá, a gente empurra o novo para o lado
+                        let contagem = coordenadasUsadas[chaveCoord];
+                        
+                        // Fórmula para criar um círculo em volta do ponto original
+                        let angulo = contagem * (Math.PI / 4); // Distribui em 45 graus
+                        let raio = 0.00015; // Aproximadamente 15 metros no mapa
+                        
+                        lat += Math.sin(angulo) * raio;
+                        lon += Math.cos(angulo) * raio;
+                        
+                        coordenadasUsadas[chaveCoord]++;
+                    } else {
+                        coordenadasUsadas[chaveCoord] = 1;
+                    }
+
+                    const icon = L.divIcon({ 
+                        className: 'pin-' + pdv.status, 
+                        html: '<div class="custom-pin"></div>', 
+                        iconSize: [30, 30], 
+                        iconAnchor: [15, 30] 
+                    });
+
+                    // Usa as novas coordenadas (lat, lon) modificadas para renderizar o ping
+                    L.marker([lat, lon], { icon }).addTo(camadaPdvs)
+                    .bindPopup(`
+                        <div id="popup-container-${pdv.id}">
+                            <b>${pdv.numero_pdv} - ${pdv.nome}</b><br>
+                            Status: <b>${pdv.status.toUpperCase()}</b><br>
+                            <hr>
+                            <button class="btn-primario" style="background:#28a745; width:100%;" onclick="alterarStatus(${pdv.id}, 'concluido')">✔ Marcar Concluído</button>
+                            <button class="btn-primario" style="background:#dc3545; width:100%; margin-top:5px;" onclick="alterarStatus(${pdv.id}, 'problema')">✖ Relatar Problema</button>
+                            <button class="btn-primario" style="background:#ffc107; color:#333; width:100%; margin-top:5px;" onclick="abrirEdicaoPdv(event, ${pdv.id})">✏️ Editar PDV</button>
+                        </div>
+                    `);
+                }
+            });
+        }
+
+        // --- FUNÇÕES DE EDIÇÃO CORRIGIDAS ---
+
+        function abrirEdicaoPdv(event, id) {
+            event.stopPropagation(); 
+
+            const pdv = todosOsPdvs.find(p => p.id == id);
+            if (!pdv) return;
+
+            setTimeout(() => {
+                const container = document.getElementById(`popup-container-${id}`);
+                if (!container) return;
+
+                container.innerHTML = `
+                    <div class="form-edicao">
+                        <h4 style="margin: 0 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">✏️ Editar PDV</h4>
+                        
+                        <label>Status:</label>
+                        <select id="edit-status-${id}">
+                            <option value="pendente" ${pdv.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+                            <option value="concluido" ${pdv.status === 'concluido' ? 'selected' : ''}>Concluído</option>
+                            <option value="problema" ${pdv.status === 'problema' ? 'selected' : ''}>Problema (Erro)</option>
+                        </select>
+
+                        <label>Número do PDV:</label>
+                        <input type="text" id="edit-numero-${id}" value="${pdv.numero_pdv}">
+
+                        <label>Nome:</label>
+                        <input type="text" id="edit-nome-${id}" value="${pdv.nome}">
+
+                        <label>Endereço:</label>
+                        <input type="text" id="edit-endereco-${id}" value="${pdv.endereco}">
+
+                        <div style="display: flex; gap: 5px; margin-top: 15px;">
+                            <button type="button" class="btn-primario" style="background:#007bff; flex: 1; margin-top: 0;" onclick="salvarEdicao(${id})">💾 Salvar</button>
+                            <button type="button" class="btn-primario" style="background:#6c757d; flex: 1; margin-top: 0;" onclick="map.closePopup()">❌ Cancelar</button>
+                        </div>
+                    </div>
+                `;
+            }, 10);
+        }
+
+        async function salvarEdicao(id) {
+            const novoStatus = document.getElementById(`edit-status-${id}`).value;
+            const novoNumero = document.getElementById(`edit-numero-${id}`).value;
+            const novoNome = document.getElementById(`edit-nome-${id}`).value;
+            const novoEndereco = document.getElementById(`edit-endereco-${id}`).value;
+
+            try {
+                const index = todosOsPdvs.findIndex(p => p.id == id);
+                if (index > -1) {
+                    todosOsPdvs[index].status = novoStatus;
+                    todosOsPdvs[index].numero_pdv = novoNumero;
+                    todosOsPdvs[index].nome = novoNome;
+                    todosOsPdvs[index].endereco = novoEndereco;
+                }
+                
+                map.closePopup(); 
+                renderizarPdvs(); 
+
+                await supabaseClient.from('pdvs').update({ 
+                    status: novoStatus,
+                    numero_pdv: novoNumero,
+                    nome: novoNome,
+                    endereco: novoEndereco
+                }).eq('id', id);
+
+                setTimeout(() => { carregarPdvsDoBanco(); }, 500);
+
+            } catch (error) {
+                console.error("Erro ao salvar edição:", error);
+                alert("Erro ao salvar os dados no banco.");
+            }
+        }
+
+        // -------------------------------
+
+        function ativarRealtime() {
+            supabaseClient.channel('mudancas').on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'pdvs', filter: `grupo_id=eq.${grupoAtual}` }, 
+                () => carregarPdvsDoBanco()
+            ).subscribe();
+        }
+
+        async function alterarStatus(id, novoStatus) {
+            try {
+                const index = todosOsPdvs.findIndex(p => p.id == id);
+                if(index > -1) {
+                    todosOsPdvs[index].status = novoStatus;
+                    renderizarPdvs();
+                }
+                
+                await supabaseClient.from('pdvs').update({ status: novoStatus }).eq('id', id);
+                setTimeout(() => { carregarPdvsDoBanco(); }, 500);
+
+            } catch (error) {
+                console.error("Erro:", error);
+            }
+        }
+
+        document.getElementById('uploadExcel').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            const fd = new FormData();
+            fd.append('file', file); fd.append('grupo_id', grupoAtual);
+            document.getElementById('todo-list').innerHTML = "Processando...";
+            await fetch(URL_BACKEND_RENDER, { method: 'POST', body: fd });
+        });
+    </script>
+</body>
+</html>

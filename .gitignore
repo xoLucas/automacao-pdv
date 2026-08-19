@@ -1,0 +1,6 @@
+__pycache__/
+
+*.pyc
+
+api-pdv-tracker.env
+.env

@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pandas
+openpyxl
+geopy
+python-multipart
+supabase
+googlemaps
+python-dotenv
