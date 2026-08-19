@@ -653,10 +653,33 @@
 
         document.getElementById('uploadExcel').addEventListener('change', async (e) => {
             const file = e.target.files[0];
+            if (!file) return;
+
             const fd = new FormData();
-            fd.append('file', file); fd.append('grupo_id', grupoAtual);
-            document.getElementById('todo-list').innerHTML = "Processando...";
-            await fetch(URL_BACKEND_RENDER, { method: 'POST', body: fd });
+            fd.append('file', file); 
+            fd.append('grupo_id', grupoAtual);
+            
+            document.getElementById('todo-list').innerHTML = "<p style='text-align:center;'>Processando planilha... Aguarde os PDVs aparecerem no mapa.</p>";
+            
+            try {
+                const response = await fetch(URL_BACKEND_RENDER, { method: 'POST', body: fd });
+                const data = await response.json();
+
+                // Verifica se o backend retornou um erro (como a falta da coluna "Endereço")
+                if (data.erro) {
+                    document.getElementById('todo-list').innerHTML = `<p style="color: red; text-align:center;"><b>Erro:</b> ${data.erro}</p>`;
+                    alert(data.erro);
+                } else {
+                    // Sucesso inicial - os dados começarão a ser inseridos no Supabase em background
+                    console.log(data.mensagem);
+                }
+            } catch (error) {
+                document.getElementById('todo-list').innerHTML = `<p style="color: red; text-align:center;">Erro ao conectar com o servidor.</p>`;
+                console.error("Falha na requisição:", error);
+            }
+            
+            // Limpa o input para permitir enviar a mesma planilha novamente se necessário
+            e.target.value = '';
         });
     </script>
 </body>

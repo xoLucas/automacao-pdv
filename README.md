@@ -47,6 +47,7 @@ CREATE TABLE pdvs (
 );
 ```
 *(Aceite a sugestão da plataforma para habilitar o RLS - Row Level Security na tabela recém-criada).*
+*(Lembre-se de ativar o Realtime).*
 
 ### 2.2. Configuração de Políticas de Segurança (RLS)
 Acesse a aba **Table Editor** na barra de navegação à esquerda, vá até **RLS Policies** para a tabela `pdvs` e crie as 3 políticas abaixo executando-as no SQL Editor:
@@ -78,12 +79,18 @@ WITH CHECK (false);
 
 ### 2.3. Obtendo as Credenciais do Supabase
 1. Acesse **Project Settings** (ícone de engrenagem) > **API**.
-2. Na seção *Project API keys*, copie a chave `anon` / `public` e cole na variável `Supabase_Key` no seu arquivo `.env`.
+2. Na seção *API keys*, copie a chave API KEY que começa com sb_publishable e cole na variável `Supabase_Key` no seu arquivo `.env`.
 3. Na seção *Data API*, copie a **URL** da API (certifique-se de copiar sem as barras finais, terminando em `.co`) e cole na variável `Supabase_URL` do seu `.env`.
 
 ---
 
-## ⚙️ 3. Deploy do Backend (Render)
+## 3. Obtendo as Credenciais do Google Maps
+1. Acesse o Google Cloud e busque pela API Key **Geocoding API**.
+2. Cole a chave no env.
+
+---
+
+## ⚙️ 4. Deploy do Backend (Render)
 
 O backend (motor de processamento da planilha e geolocalização) será hospedado no Render.
 
@@ -100,7 +107,7 @@ O backend (motor de processamento da planilha e geolocalização) será hospedad
 5. Finalize a criação e inicie o deploy.
 6. Após a publicação bem-sucedida, copie a URL pública gerada pelo Render (ex: `https://sua-aplicacao.onrender.com`).
 
-### 3.1. Conectando Frontend e Backend
+### 4.1. Conectando Frontend e Backend
 Abra o arquivo `index.html` em um editor de texto, localize a declaração da URL base do backend e substitua o valor pela URL copiada no passo anterior:
 
 ```javascript
@@ -109,7 +116,7 @@ const URL_BACKEND_BASE = "https://sua-aplicacao.onrender.com"; // Substitua pelo
 
 ---
 
-## 🌐 4. Deploy do Frontend (Netlify)
+## 🌐 5. Deploy do Frontend (Netlify)
 
 Com a arquitetura conectada, o último passo é publicar a interface.
 
