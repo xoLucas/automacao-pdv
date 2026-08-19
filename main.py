@@ -34,6 +34,13 @@ supabase: Client = create_client(URL_SUPABASE, CHAVE_SUPABASE)
 geolocator = Nominatim(user_agent="app_pdv_tracker_v3")
 gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
 
+@app.get("/config")
+async def get_config():
+    return {
+        "supabase_url": URL_SUPABASE,
+        "supabase_key": CHAVE_SUPABASE
+    }
+
 # =========================================================
 # FUNÇÕES DE AUXÍLIO (GEOLOCALIZAÇÃO)
 # =========================================================

@@ -204,12 +204,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <script>
-        const URL_SUPABASE = "https://amdsexfmtwqgdihlyqti.supabase.co";
-        const CHAVE_SUPABASE = "sb_publishable_xisIAK-FwYMFXirHON0GqA_XCQrp6St";
-        const URL_BACKEND_RENDER = "https://api-pdv-tracker.onrender.com/processar-planilha/"; 
-        //const URL_BACKEND_RENDER = "http://127.0.0.1:8000/processar-planilha/"
+        // ======= NOVAS CONFIGURAÇÕES DINÂMICAS =======
+        const URL_BACKEND_BASE = "https://api-pdv-tracker.onrender.com"; 
+        // const URL_BACKEND_BASE = "http://127.0.0.1:8000" // (Use esta para testes locais)
         
-        const supabaseClient = window.supabase.createClient(URL_SUPABASE, CHAVE_SUPABASE);
+        const URL_BACKEND_RENDER = URL_BACKEND_BASE + "/processar-planilha/"; 
+        
+        let supabaseClient; // Agora inicializa vazio, aguardando o backend
+        
         const parametrosUrl = new URLSearchParams(window.location.search);
         let grupoAtual = parametrosUrl.get('grupo');
 
@@ -225,12 +227,31 @@
         let meuUsuarioId = 'user-' + Math.random().toString(36).substr(2, 9);
         let canalPresenca;
         let marcadoresOutrosUsuarios = {};
-        
         let acaoPendente = null;
 
-        if (grupoAtual) {
-            iniciarApp();
+        // Função que busca as variáveis de ambiente do backend
+        async function carregarConfiguracoes() {
+            try {
+                const response = await fetch(URL_BACKEND_BASE + "/config");
+                if (!response.ok) throw new Error("Erro de rede ao buscar configurações");
+                
+                const config = await response.json();
+                
+                // Inicializa o Supabase com os dados vindos do backend
+                supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_key);
+                
+                // Se o usuário já estiver na URL de um grupo, inicia o app
+                if (grupoAtual) {
+                    iniciarApp();
+                }
+            } catch (error) {
+                console.error("Erro ao carregar configurações:", error);
+                alert("Falha ao conectar com o servidor para buscar as configurações da API.");
+            }
         }
+
+        // Inicia o carregamento assim que a página abre
+        carregarConfiguracoes();
 
         function acessarGrupo() {
             const codigo = document.getElementById('codigoGrupoInput').value.trim();
@@ -323,7 +344,6 @@
         function renderizarOutrosUsuarios(estado) {
             const usuariosAtivosAgora = [];
 
-            // 1. Passa por todo mundo que está ONLINE no momento
             for (const key in estado) {
                 const dados = estado[key][0]; 
                 
@@ -333,24 +353,18 @@
                     const iconOnline = L.divIcon({ className: 'other-user-marker', html: '<div class="other-user-pulse"></div>', iconSize: [15, 15] });
 
                     if (marcadoresOutrosUsuarios[dados.id]) {
-                        // Se o pino já existe, atualiza a posição e GARANTE que ele está com a cor laranja (online)
                         marcadoresOutrosUsuarios[dados.id].setLatLng([dados.lat, dados.lng]);
                         marcadoresOutrosUsuarios[dados.id].setIcon(iconOnline);
                     } else {
-                        // Se é um colega novo, cria o pino dele
                         marcadoresOutrosUsuarios[dados.id] = L.marker([dados.lat, dados.lng], { icon: iconOnline, zIndexOffset: 900 }).addTo(map);
                     }
                 }
             }
 
-            // 2. Verifica os "Fantasmas" (quem estava no mapa mas sumiu do estado online)
             for (const idColega in marcadoresOutrosUsuarios) {
                 if (!usuariosAtivosAgora.includes(idColega)) {
-                    // O SEGREDO ESTÁ AQUI: Em vez de usar map.removeLayer(), nós mudamos o ícone!
                     const iconOffline = L.divIcon({ className: 'offline-user-marker', html: '', iconSize: [12, 12] });
                     marcadoresOutrosUsuarios[idColega].setIcon(iconOffline);
-                    
-                    // Aviso no console só para você acompanhar nos testes
                     console.log(`Colega ${idColega} ficou offline. Mantendo última localização.`);
                 }
             }
@@ -584,8 +598,7 @@
                 let novaLon = pdvAtual.lon; 
 
                 if (pdvAtual.endereco !== novoEndereco) {
-                    const baseUrl = URL_BACKEND_RENDER.replace('/processar-planilha/', '');
-                    const response = await fetch(`${baseUrl}/geolocalizar/?endereco=${encodeURIComponent(novoEndereco)}`);
+                    const response = await fetch(`${URL_BACKEND_BASE}/geolocalizar/?endereco=${encodeURIComponent(novoEndereco)}`);
                     const data = await response.json();
 
                     if (data.sucesso) {
