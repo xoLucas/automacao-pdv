@@ -204,13 +204,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <script>
-        // ======= NOVAS CONFIGURAÇÕES DINÂMICAS =======
+        // ======= CONFIGURAÇÕES DINÂMICAS =======
         const URL_BACKEND_BASE = "https://automacao-pdv.onrender.com"; 
         // const URL_BACKEND_BASE = "http://127.0.0.1:8000" // (Use esta para testes locais)
         
         const URL_BACKEND_RENDER = URL_BACKEND_BASE + "/processar-planilha/"; 
         
-        let supabaseClient; // Agora inicializa vazio, aguardando o backend
+        let supabaseClient;
         
         const parametrosUrl = new URLSearchParams(window.location.search);
         let grupoAtual = parametrosUrl.get('grupo');
@@ -229,7 +229,6 @@
         let marcadoresOutrosUsuarios = {};
         let acaoPendente = null;
 
-        // Função que busca as variáveis de ambiente do backend
         async function carregarConfiguracoes() {
             try {
                 const response = await fetch(URL_BACKEND_BASE + "/config");
@@ -237,10 +236,8 @@
                 
                 const config = await response.json();
                 
-                // Inicializa o Supabase com os dados vindos do backend
                 supabaseClient = window.supabase.createClient(config.supabase_url, config.supabase_key);
                 
-                // Se o usuário já estiver na URL de um grupo, inicia o app
                 if (grupoAtual) {
                     iniciarApp();
                 }
@@ -250,7 +247,6 @@
             }
         }
 
-        // Inicia o carregamento assim que a página abre
         carregarConfiguracoes();
 
         function acessarGrupo() {
