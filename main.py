@@ -119,8 +119,8 @@ def processar_em_segundo_plano(df, grupo_id, coluna_endereco):
         cnpj_bruto = pegar_dado('CNPJ', 'Sem CNPJ')
         
         # Se o CNPJ for inativo ou MEI, pula para a próxima linha da planilha
-        if not validar_cnpj_opencnpj(cnpj_bruto):
-            continue
+        # if not validar_cnpj_opencnpj(cnpj_bruto):
+        #     continue
 
         # A geolocalização só roda se o CNPJ for válido
         lat, lon = buscar_coordenadas(endereco_raw)
