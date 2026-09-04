@@ -74,7 +74,7 @@ ALTER POLICY "Enable update access for anon users"
 ON "public"."pdvs"
 TO anon
 USING (true)
-WITH CHECK (false);
+WITH CHECK (true);
 ```
 
 ### 2.3. Obtendo as Credenciais do Supabase
