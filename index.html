@@ -34,20 +34,24 @@
         .pdv-card.pendente { border-left-color: #007bff; }
         .pdv-card.concluido { border-left-color: #28a745; opacity: 0.7; }
         .pdv-card.problema { border-left-color: #dc3545; }
+        .pdv-card.marcado { border-left-color: #ffee00; }
 
         .pdv-card.sub-pendente { border-left-color: #fd7e14; } 
         .pdv-card.sub-concluido { border-left-color: #19692c; opacity: 0.8; } 
         .pdv-card.sub-problema { border-left-color: #ff9999; } 
+        .pdv-card.sub-marcado { border-left-color: #5e4502; }
         
         /* Estilo dos Pinos */
         .custom-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; background: #6c757d; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; border: 2px solid #fff; }
         .pin-pendente .custom-pin { background-color: #007bff; }
         .pin-concluido .custom-pin { background-color: #28a745; }
         .pin-problema .custom-pin { background-color: #dc3545; }
+        .pin-marcado .custom-pin { background-color: #ffee00; }
 
         .pin-sub-pendente .custom-pin { background-color: #fd7e14; }
         .pin-sub-concluido .custom-pin { background-color: #19692c; }
         .pin-sub-problema .custom-pin { background-color: #ff9999; }
+        .pin-sub-marcado .custom-pin { background-color: #5e4502; }
 
         /* Estilo do Marcador de Localização */
         .user-location-marker { background-color: #2c7efc; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
@@ -206,7 +210,7 @@
     <script>
         // ======= CONFIGURAÇÕES DINÂMICAS =======
         const URL_BACKEND_BASE = "https://automacao-pdv.onrender.com"; 
-        // const URL_BACKEND_BASE = "http://127.0.0.1:8000" // (Use esta para testes locais)
+        // const URL_BACKEND_BASE = "http://127.0.0.1:8005" // (Use esta para testes locais)
         
         const URL_BACKEND_RENDER = URL_BACKEND_BASE + "/processar-planilha/"; 
         
@@ -276,6 +280,7 @@
             camadaPdvs = L.layerGroup().addTo(map);
 
             adicionarBotaoCentralizar();
+            adicionarBotaoNovoPdv();
             configurarLocalizacaoEmTempoReal();
 
             carregarPdvsDoBanco();
@@ -382,6 +387,50 @@
             map.addControl(new CenterControl());
         }
 
+        function adicionarBotaoNovoPdv() {
+            const NovoPdvControl = L.Control.extend({
+                options: { position: 'bottomleft' },
+                onAdd: function() {
+                    const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                    div.innerHTML = `<div class="btn-center-map" title="Criar PDV na minha posição">📌</div>`;
+                    div.onclick = function() {
+                        sumonarPdvNaMinhaPosicao();
+                    };
+                    return div;
+                }
+            });
+            map.addControl(new NovoPdvControl());
+        }
+
+        async function sumonarPdvNaMinhaPosicao() {
+            if (!minhaPosicaoAtual) {
+                alert("Aguardando sinal do GPS...");
+                return;
+            }
+
+            if (!confirm("Criar um novo PDV na sua posição atual?")) return;
+
+            try {
+                const { error } = await supabaseClient.from('pdvs').insert({
+                    nome: 'Novo PDV',
+                    numero_pdv: '',
+                    endereco: '',
+                    status: 'pendente',
+                    grupo_id: grupoAtual,
+                    lat: minhaPosicaoAtual.lat,
+                    lon: minhaPosicaoAtual.lng
+                });
+
+                if (error) throw error;
+
+                await carregarPdvsDoBanco();
+                alert("Pino criado! Clique nele e em '✏️ Editar PDV' para preencher as informações.");
+            } catch (error) {
+                console.error("Erro ao criar PDV:", error);
+                alert("Erro ao criar o PDV. Tente novamente.");
+            }
+        }
+
         function configurarLocalizacaoEmTempoReal() {
             if (!navigator.geolocation) return;
             navigator.geolocation.watchPosition(
@@ -440,7 +489,9 @@
             camadaPdvs.clearLayers(); 
 
             const pdvsFiltrados = todosOsPdvs.filter(p => {
-                if (p.status !== visaoAtual) return false;
+                if (visaoAtual === 'pendente') {
+                    if (p.status !== 'pendente' && p.status !== 'marcado') return false;
+                } else if (p.status !== visaoAtual) return false;
                 const isSub = p.pad_sub && p.pad_sub.toLowerCase() === 'sub';
                 if (isSub && !mostrarSubstituicao) return false;
                 if (isSub && visaoAtual === 'problema') return false;
@@ -477,8 +528,8 @@
                 }
 
                 card.innerHTML = `
-                    <h4>${pdv.nome} ${badgeHtml}</h4>
-                    <p>PDV: ${pdv.numero_pdv}</p>
+                    <h4>${pdv.nome || 'Sem nome'} ${badgeHtml}</h4>
+                    <p>PDV: ${pdv.numero_pdv || '—'}</p>
                     <p>${pdv.endereco}</p>
                     <div style="display: flex; gap: 5px;">
                         ${botoesHtml}
@@ -527,7 +578,7 @@
                     L.marker([lat, lon], { icon }).addTo(camadaPdvs)
                     .bindPopup(`
                         <div id="popup-container-${pdv.id}">
-                            <b>${pdv.numero_pdv} - ${pdv.nome}</b> ${badgeHtml}<br>
+                            <b>${pdv.numero_pdv || '—'} - ${pdv.nome || 'Sem nome'}</b> ${badgeHtml}<br>
                             Status: <b>${statusLabel}</b><br>
                             <hr>
                             <button class="btn-primario" style="background:#28a745; width:100%;" onclick="pedirConfirmacao('${isSub ? 'Marcar como UTILIZADO?' : 'Marcar este PDV como CONCLUÍDO?'}', 'concluido', ${pdv.id})">${textoMarcarFeito}</button>
@@ -559,6 +610,7 @@
                             <option value="pendente" ${pdv.status === 'pendente' ? 'selected' : ''}>Pendente</option>
                             <option value="concluido" ${pdv.status === 'concluido' ? 'selected' : ''}>${isSub ? 'Utilizado' : 'Concluído'}</option>
                             <option value="problema" ${pdv.status === 'problema' ? 'selected' : ''}>Problema (Erro)</option>
+                            <option value="marcado" ${pdv.status === 'marcado' ? 'selected' : ''}>Marcado</option>
                         </select>
 
                         <label>Número do PDV:</label>
